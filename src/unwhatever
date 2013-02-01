@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import subprocess
+import itertools
+
+def get_file_count(output):
+    lines = output.strip().split('\n')
+    files = [line.split('/')[0] for line in lines]
+    uniq = itertools.groupby(files)
+    return sum(1 for _ in uniq)
+
+
+commands = [
+    ('.tar.bz2', 'tar tf %(filename)s',         'tar -C %(dir)s -xvjf %(filename)s'),
+    ('.tar.gz',  'tar tf %(filename)s',         'tar -C %(dir)s -xvzf %(filename)s'),
+    ('.tgz',     'tar tf %(filename)s',         'tar -C %(dir)s -xvzf %(filename)s'),
+    ('.bz2',     'basename %(filename)s .bz2',  'bunzip2 -k %(filename)s'),
+    ('.gz',      'basename %(filename)s .gz',   'gunzip -k %(filename)s'),
+    ('.tar',     'tar tf %(filename)s',         'tar -C %(dir)s -xvf %(filename)s'),
+    ('.lzma',    'basename %(filename)s .lzma', 'unlzma -k %(filename)s'),
+    ('.zip',     'zipinfo -1 %(filename)s',     'unzip -d %(dir)s %(filename)s'),
+]
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print 'Usage:'
+        print ' ', sys.argv[0], '<filename>'
+        print
+        print '  <filename>  should have one of the following suffixes:'
+        for (extension, _) in commands:
+            print '                 ', extension
+
+        sys.exit(1)
+
+    filename = sys.argv[1]
+    for (extension, listcmd, command) in commands:
+        if filename.endswith(extension):
+            listcmd = listcmd % {"filename":filename}
+            listprocess = subprocess.Popen(listcmd, stdout=subprocess.PIPE, shell=True)
+            output = listprocess.communicate()[0]
+            multiple = get_file_count(output) > 1
+            
+            base = filename[0:-len(extension)]
+            if multiple:
+                target = base
+                prefix = 'mkdir %(dir)s && '
+            else:
+                target = '.'
+                prefix = ''
+            command = (prefix + command) % {"filename":filename, "dir":target}
+
+
+            print command
+            ret = os.system(command)
+            ret =0 
+            sys.exit(ret)
+
+    print filename + ': unknown extension'
+    sys.exit(1)
+
+    
+
+
+# Local Variables:
+#   mode: python
+#
+# End:
